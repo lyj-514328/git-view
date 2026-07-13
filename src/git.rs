@@ -270,6 +270,15 @@ impl GitRepo {
         Ok(file_diffs)
     }
 
+    pub fn get_tree_files(&self) -> Result<Vec<String>> {
+        let head = self.repo.head()?.peel_to_commit()?;
+        let tree = head.tree()?;
+        let mut files = Vec::new();
+        tree_recurse(&self.repo, &tree, String::new(), &mut files)?;
+        files.sort();
+        Ok(files)
+    }
+
     pub fn get_stashes(&mut self) -> Result<Vec<StashInfo>> {
         let mut stashes = Vec::new();
         self.repo.stash_foreach(|index, message, oid| {
@@ -398,4 +407,34 @@ impl GitRepo {
 
         Ok(file_diffs.into_inner())
     }
+}
+
+fn tree_recurse(
+    repo: &Repository,
+    tree: &git2::Tree,
+    prefix: String,
+    out: &mut Vec<String>,
+) -> Result<()> {
+    for entry in tree {
+        let name = String::from_utf8_lossy(entry.name_bytes()).to_string();
+        let path = if prefix.is_empty() {
+            name
+        } else {
+            format!("{}/{}", prefix, name)
+        };
+        match entry.kind() {
+            Some(git2::ObjectType::Blob) => {
+                out.push(path);
+            }
+            Some(git2::ObjectType::Tree) => {
+                if let Ok(obj) = entry.to_object(repo) {
+                    if let Ok(subtree) = obj.peel_to_tree() {
+                        tree_recurse(repo, &subtree, path, out)?;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
