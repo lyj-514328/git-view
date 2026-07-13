@@ -30,27 +30,6 @@ impl FilesTab {
             files.extend(unstaged);
         }
 
-        if let Ok(commits) = repo.get_commits(1) {
-            if let Some(commit) = commits.first() {
-                if let Ok(diffs) = repo.get_commit_diff(&commit.id) {
-                    for diff in &diffs {
-                        let path = if !diff.new_path.is_empty() {
-                            diff.new_path.clone()
-                        } else {
-                            diff.old_path.clone()
-                        };
-                        if !files.iter().any(|f| f.path == path) {
-                            files.push(StatusEntry {
-                                path,
-                                status: diff.status.clone(),
-                                staged: false,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
         self.files = files;
         self.selected = 0;
         self.scroll = 0;
