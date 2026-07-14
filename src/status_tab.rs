@@ -77,7 +77,6 @@ impl StatusTab {
         let inner = block.inner(area);
         f.render_widget(block, area);
 
-        let width = inner.width as usize;
         let mut lines: Vec<Line> = Vec::new();
 
         if !self.staged.is_empty() {
@@ -90,12 +89,10 @@ impl StatusTab {
                 let style = status_style(entry, is_selected, theme);
                 let marker = if is_selected { ">" } else { " " };
                 let status_char = status_char(&entry.status);
-                let text = if is_selected {
-                    format!(" {} {} {:w$}", marker, status_char, entry.path, w = width)
-                } else {
-                    format!(" {} {} {}", marker, status_char, entry.path)
-                };
-                lines.push(Line::from(Span::styled(text, style)));
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, status_char, entry.path),
+                    style,
+                )));
             }
         }
 
@@ -110,12 +107,10 @@ impl StatusTab {
                 let style = status_style(entry, is_selected, theme);
                 let marker = if is_selected { ">" } else { " " };
                 let status_char = status_char(&entry.status);
-                let text = if is_selected {
-                    format!(" {} {} {:w$}", marker, status_char, entry.path, w = width)
-                } else {
-                    format!(" {} {} {}", marker, status_char, entry.path)
-                };
-                lines.push(Line::from(Span::styled(text, style)));
+                lines.push(Line::from(Span::styled(
+                    format!(" {} {} {}", marker, status_char, entry.path),
+                    style,
+                )));
             }
         }
 
@@ -149,19 +144,17 @@ fn status_char(st: &StatusType) -> &'static str {
 }
 
 fn status_style(entry: &StatusEntry, selected: bool, theme: &Theme) -> Style {
-    let base = if entry.staged {
-        Style::default().fg(theme.file_entry_staged)
+    if selected {
+        return theme.selected();
+    }
+    if entry.staged {
+        Style::default().fg(theme.file_entry_staged).bg(theme.light_bg)
     } else {
         let fg = match entry.status {
             StatusType::Untracked => theme.file_entry_untracked,
             StatusType::Modified => theme.file_entry_modified,
             _ => theme.file_entry,
         };
-        Style::default().fg(fg)
-    };
-    if selected {
-        theme.selected_on(base)
-    } else {
-        base
+        Style::default().fg(fg).bg(theme.light_bg)
     }
 }

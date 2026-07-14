@@ -20,7 +20,6 @@ pub enum Tab {
 
 pub struct App {
     pub repo: GitRepo,
-    pub repo_path_text: String,
     pub current_tab: Tab,
     pub status_tab: StatusTab,
     pub log_tab: LogTab,
@@ -35,12 +34,8 @@ pub struct App {
 impl App {
     pub fn new(repo_path: &Path, theme: Theme) -> anyhow::Result<Self> {
         let repo = GitRepo::open(repo_path)?;
-        let repo_path_text = repo.workdir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| repo_path.to_string_lossy().to_string());
         let mut app = Self {
             repo,
-            repo_path_text,
             current_tab: Tab::Status,
             status_tab: StatusTab::new(),
             log_tab: LogTab::new(),
@@ -224,20 +219,6 @@ impl App {
             Tab::Stashes => 2,
         };
 
-        let main_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Min(1),
-                Constraint::Length(3),
-            ])
-            .split(area);
-
-        let top_bar = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(1), Constraint::Length(40)])
-            .split(main_layout[0]);
-
         let tabs = Tabs::new(
             tab_titles
                 .iter()
@@ -252,24 +233,43 @@ impl App {
                 })
                 .collect::<Vec<_>>(),
         )
-        .block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(self.theme.tab_bar_style()),
-        )
         .select(tab_index);
 
-        f.render_widget(tabs, top_bar[0]);
+        let main_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(1),
+                Constraint::Length(3),
+            ])
+            .split(area);
 
-        let path_text = if self.repo_path_text.len() > 36 {
-            format!("…{}", &self.repo_path_text[self.repo_path_text.len().saturating_sub(35)..])
-        } else {
-            self.repo_path_text.clone()
-        };
+        let header_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(self.theme.tab_bar_style());
+        let header_inner = header_block.inner(main_layout[0]);
+        f.render_widget(header_block, main_layout[0]);
+
+        let repo_path = self.repo.workdir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let path_len = repo_path.len() as u16;
+        let tabs_width = header_inner.width.saturating_sub(path_len + 2).max(1);
+
+        let header_split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(tabs_width), Constraint::Min(1)])
+            .split(header_inner);
+
+        f.render_widget(tabs, header_split[0]);
+
+        let path_text = Line::from(Span::styled(
+            repo_path,
+            self.theme.dim_text(),
+        ));
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled(path_text, self.theme.dim_text())))
-                .alignment(ratatui::layout::Alignment::Right),
-            top_bar[1],
+            Paragraph::new(path_text).alignment(ratatui::layout::Alignment::Right),
+            header_split[1],
         );
 
         let content_area = main_layout[1];
