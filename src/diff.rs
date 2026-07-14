@@ -5,12 +5,11 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 use std::cmp;
 use std::path::Path;
-use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiffViewMode {
@@ -295,7 +294,7 @@ impl DiffView {
             .take(area.height as usize)
             .collect();
 
-        let para = Paragraph::new(visible_lines);
+        let para = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
         f.render_widget(para, area);
     }
 
@@ -341,7 +340,7 @@ impl DiffView {
             let max_lines = cmp::max(paired_left.len(), paired_right.len());
             for i in 0..max_lines {
                 if i < paired_left.len() {
-                    left_lines.push(truncate_line(&paired_left[i], half_width.saturating_sub(2) as usize));
+                    left_lines.push(paired_left[i].clone());
                 } else {
                     left_lines.push(Line::from(Span::styled(
                         String::new(),
@@ -350,7 +349,7 @@ impl DiffView {
                 }
 
                 if i < paired_right.len() {
-                    right_lines.push(truncate_line(&paired_right[i], (area.width - half_width - 1).saturating_sub(2) as usize));
+                    right_lines.push(paired_right[i].clone());
                 } else {
                     right_lines.push(Line::from(Span::styled(
                         String::new(),
@@ -371,8 +370,14 @@ impl DiffView {
             .take(area.height as usize)
             .collect();
 
-        f.render_widget(Paragraph::new(visible_left), left_area);
-        f.render_widget(Paragraph::new(visible_right), right_area);
+        f.render_widget(
+            Paragraph::new(visible_left).wrap(Wrap { trim: false }),
+            left_area,
+        );
+        f.render_widget(
+            Paragraph::new(visible_right).wrap(Wrap { trim: false }),
+            right_area,
+        );
     }
 
     fn pair_lines(&self, hunk: &Hunk, extension: &str, theme: &Theme) -> (Vec<Line<'_>>, Vec<Line<'_>>) {
@@ -447,39 +452,4 @@ impl DiffView {
         (left, right)
     }
 }
-
-fn truncate_line(line: &Line, max_width: usize) -> Line<'static> {
-    if max_width == 0 {
-        return Line::from(Span::styled(String::new(), Style::default()));
-    }
-    let mut result_spans = Vec::new();
-    let mut current_width = 0;
-    for span in &line.spans {
-        let s = span.content.as_ref();
-        let width = UnicodeWidthStr::width(s);
-        if current_width + width <= max_width {
-            result_spans.push(Span::styled(s.to_string(), span.style));
-            current_width += width;
-        } else {
-            let remaining = max_width.saturating_sub(current_width);
-            if remaining == 0 {
-                result_spans.push(Span::styled("\u{2026}".to_string(), span.style));
-            } else {
-                let mut truncated = String::new();
-                let mut w = 0;
-                for c in s.chars() {
-                    let cw = UnicodeWidthStr::width(c.to_string().as_str());
-                    if w + cw > remaining {
-                        truncated.push('\u{2026}');
-                        break;
-                    }
-                    truncated.push(c);
-                    w += cw;
-                }
-                result_spans.push(Span::styled(truncated, span.style));
-            }
-            break;
-        }
-    }
-    Line::from(result_spans)
 }
