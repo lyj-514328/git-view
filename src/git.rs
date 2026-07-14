@@ -241,44 +241,6 @@ impl GitRepo {
         Ok(file_diffs.remove(0))
     }
 
-    pub fn get_diff_for_file(&self, path: &str) -> Result<Vec<FileDiff>> {
-        let mut file_diffs = Vec::new();
-
-        let mut diff_opts = DiffOptions::new();
-        diff_opts.pathspec(path);
-
-        let head_tree = self.repo.head().ok().and_then(|h| h.peel_to_tree().ok());
-        let index = self.repo.index()?;
-
-        let diff_staged = self.repo.diff_tree_to_index(
-            head_tree.as_ref(),
-            Some(&index),
-            Some(&mut diff_opts),
-        )?;
-        file_diffs.extend(Self::diff_to_file_diffs(&diff_staged)?);
-
-        let mut diff_opts = DiffOptions::new();
-        diff_opts.pathspec(path);
-        diff_opts.include_untracked(true);
-        diff_opts.recurse_untracked_dirs(true);
-
-        let diff_unstaged = self
-            .repo
-            .diff_index_to_workdir(Some(&index), Some(&mut diff_opts))?;
-        file_diffs.extend(Self::diff_to_file_diffs(&diff_unstaged)?);
-
-        Ok(file_diffs)
-    }
-
-    pub fn get_tree_files(&self) -> Result<Vec<String>> {
-        let head = self.repo.head()?.peel_to_commit()?;
-        let tree = head.tree()?;
-        let mut files = Vec::new();
-        tree_recurse(&self.repo, &tree, String::new(), &mut files)?;
-        files.sort();
-        Ok(files)
-    }
-
     pub fn get_stashes(&mut self) -> Result<Vec<StashInfo>> {
         let mut stashes = Vec::new();
         self.repo.stash_foreach(|index, message, oid| {
@@ -407,34 +369,4 @@ impl GitRepo {
 
         Ok(file_diffs.into_inner())
     }
-}
-
-fn tree_recurse(
-    repo: &Repository,
-    tree: &git2::Tree,
-    prefix: String,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    for entry in tree {
-        let name = String::from_utf8_lossy(entry.name_bytes()).to_string();
-        let path = if prefix.is_empty() {
-            name
-        } else {
-            format!("{}/{}", prefix, name)
-        };
-        match entry.kind() {
-            Some(git2::ObjectType::Blob) => {
-                out.push(path);
-            }
-            Some(git2::ObjectType::Tree) => {
-                if let Ok(obj) = entry.to_object(repo) {
-                    if let Ok(subtree) = obj.peel_to_tree() {
-                        tree_recurse(repo, &subtree, path, out)?;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    Ok(())
 }

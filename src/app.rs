@@ -1,5 +1,4 @@
 use crate::diff::{DiffView, DiffViewMode};
-use crate::files_tab::FilesTab;
 use crate::git::GitRepo;
 use crate::log_tab::LogTab;
 use crate::stashes_tab::StashesTab;
@@ -16,7 +15,6 @@ use std::path::Path;
 pub enum Tab {
     Status,
     Log,
-    Files,
     Stashes,
 }
 
@@ -25,7 +23,6 @@ pub struct App {
     pub current_tab: Tab,
     pub status_tab: StatusTab,
     pub log_tab: LogTab,
-    pub files_tab: FilesTab,
     pub stashes_tab: StashesTab,
     pub diff_view: DiffView,
     pub theme: Theme,
@@ -43,7 +40,6 @@ impl App {
             current_tab: Tab::Status,
             status_tab: StatusTab::new(),
             log_tab: LogTab::new(),
-            files_tab: FilesTab::new(),
             stashes_tab: StashesTab::new(),
             diff_view: DiffView::new(),
             theme,
@@ -59,7 +55,6 @@ impl App {
         match self.current_tab {
             Tab::Status => self.status_tab.refresh(&self.repo),
             Tab::Log => self.log_tab.refresh(&self.repo),
-            Tab::Files => self.files_tab.refresh(&self.repo),
             Tab::Stashes => self.stashes_tab.refresh(&mut self.repo),
         }
     }
@@ -67,8 +62,7 @@ impl App {
     pub fn next_tab(&mut self) {
         self.current_tab = match self.current_tab {
             Tab::Status => Tab::Log,
-            Tab::Log => Tab::Files,
-            Tab::Files => Tab::Stashes,
+            Tab::Log => Tab::Stashes,
             Tab::Stashes => Tab::Status,
         };
         self.show_diff = false;
@@ -79,8 +73,7 @@ impl App {
         self.current_tab = match self.current_tab {
             Tab::Status => Tab::Stashes,
             Tab::Log => Tab::Status,
-            Tab::Files => Tab::Log,
-            Tab::Stashes => Tab::Files,
+            Tab::Stashes => Tab::Log,
         };
         self.show_diff = false;
         self.refresh_current_tab();
@@ -118,7 +111,6 @@ impl App {
                         self.log_tab.move_down();
                     }
                 }
-                Tab::Files => self.files_tab.move_down(),
                 Tab::Stashes => {
                     if self.stashes_tab.show_files {
                         self.stashes_tab.file_move_down();
@@ -143,7 +135,6 @@ impl App {
                         self.log_tab.move_up();
                     }
                 }
-                Tab::Files => self.files_tab.move_up(),
                 Tab::Stashes => {
                     if self.stashes_tab.show_files {
                         self.stashes_tab.file_move_up();
@@ -189,17 +180,6 @@ impl App {
                 }
                 self.diff_view.clear();
             }
-            Tab::Files => {
-                if let Some(path) = self.files_tab.current_file() {
-                    if let Ok(diffs) = self.repo.get_diff_for_file(&path) {
-                        if let Some(diff) = diffs.into_iter().next() {
-                            self.diff_view.set_diff(diff);
-                            return;
-                        }
-                    }
-                }
-                self.diff_view.clear();
-            }
             Tab::Stashes => {
                 if self.stashes_tab.show_files {
                     if let Some(path) = self.stashes_tab.current_file_path() {
@@ -231,15 +211,13 @@ impl App {
         let tab_titles = vec![
             " Status [1] ",
             " Log [2] ",
-            " Files [3] ",
-            " Stashes [4] ",
+            " Stashes [3] ",
         ];
 
         let tab_index = match self.current_tab {
             Tab::Status => 0,
             Tab::Log => 1,
-            Tab::Files => 2,
-            Tab::Stashes => 3,
+            Tab::Stashes => 2,
         };
 
         let tabs = Tabs::new(
@@ -301,7 +279,7 @@ impl App {
                 },
             )
         } else {
-            " q:quit | h:help | d:show diff | \u{2191}\u{2193}:navigate | Tab:next | 1-4:goto tab ".to_string()
+            " q:quit | h:help | d:show diff | \u{2191}\u{2193}:navigate | Tab:next | 1-3:goto tab ".to_string()
         };
 
         let status_line = Line::from(Span::styled(mode_text, self.theme.dim_text));
@@ -323,7 +301,6 @@ impl App {
         match self.current_tab {
             Tab::Status => self.status_tab.render(f, area, &self.theme),
             Tab::Log => self.log_tab.render(f, area, &self.theme),
-            Tab::Files => self.files_tab.render(f, area, &self.theme),
             Tab::Stashes => self.stashes_tab.render(f, area, &self.theme),
         }
     }
@@ -353,7 +330,7 @@ impl App {
                 Span::styled("Switch tabs", self.theme.help_desc),
             ]),
             Line::from(vec![
-                Span::styled("  1-5        ", self.theme.help_key),
+                Span::styled("  1-3        ", self.theme.help_key),
                 Span::styled("Go to tab by number", self.theme.help_desc),
             ]),
             Line::from(vec![
