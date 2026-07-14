@@ -242,31 +242,43 @@ impl DiffView {
         let mut delete_lines: Vec<&DiffLine> = Vec::new();
         let mut add_lines: Vec<&DiffLine> = Vec::new();
 
+        let flush_pending = |left: &mut Vec<(String, Style)>,
+                              right: &mut Vec<(String, Style)>,
+                              dels: &mut Vec<&DiffLine>,
+                              adds: &mut Vec<&DiffLine>| {
+            let pair_count = cmp::max(dels.len(), adds.len());
+            for i in 0..pair_count {
+                if i < dels.len() {
+                    let line = dels[i];
+                    left.push((line.content.clone(), self.line_style(line, false, theme)));
+                } else {
+                    left.push((String::new(), Style::default()));
+                }
+                if i < adds.len() {
+                    let line = adds[i];
+                    right.push((line.content.clone(), self.line_style(line, false, theme)));
+                } else {
+                    right.push((String::new(), Style::default()));
+                }
+            }
+            dels.clear();
+            adds.clear();
+        };
+
         for line in &hunk.lines {
             match line.line_type {
+                DiffLineType::Context | DiffLineType::Header => {
+                    flush_pending(&mut left, &mut right, &mut delete_lines, &mut add_lines);
+                    let style = self.line_style(line, false, &Theme::dark());
+                    left.push((line.content.clone(), style));
+                    right.push((line.content.clone(), style));
+                }
                 DiffLineType::Delete => delete_lines.push(line),
                 DiffLineType::Add => add_lines.push(line),
-                _ => {}
             }
         }
 
-        let pair_count = cmp::max(delete_lines.len(), add_lines.len());
-
-        for i in 0..pair_count {
-            if i < delete_lines.len() {
-                let line = delete_lines[i];
-                left.push((line.content.clone(), self.line_style(line, false, theme)));
-            } else {
-                left.push((String::new(), Style::default()));
-            }
-
-            if i < add_lines.len() {
-                let line = add_lines[i];
-                right.push((line.content.clone(), self.line_style(line, false, theme)));
-            } else {
-                right.push((String::new(), Style::default()));
-            }
-        }
+        flush_pending(&mut left, &mut right, &mut delete_lines, &mut add_lines);
 
         (left, right)
     }
