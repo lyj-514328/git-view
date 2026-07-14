@@ -44,10 +44,10 @@ fn main() -> Result<()> {
         Theme::from_path(path).unwrap_or_else(|e| {
             eprintln!("Warning: failed to load theme from {:?}: {e}", path);
             eprintln!("Using default theme");
-            Theme::dark()
+            Theme::light()
         })
     } else {
-        Theme::dark()
+        Theme::light()
     };
 
     let app = App::new(&repo_path, theme)?;

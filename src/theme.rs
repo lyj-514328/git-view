@@ -168,6 +168,43 @@ impl Theme {
         }
     }
 
+    pub fn light() -> Self {
+        Self {
+            tab_active: Color::Rgb(30, 30, 30),
+            tab_inactive: Color::Rgb(140, 140, 140),
+            tab_bar_bg: Color::Rgb(230, 230, 230),
+            diff_add_fg: Color::Rgb(30, 120, 30),
+            diff_add_bg: Color::Rgb(220, 245, 220),
+            diff_delete_fg: Color::Rgb(180, 40, 40),
+            diff_delete_bg: Color::Rgb(255, 225, 225),
+            diff_context_bg: Color::Rgb(245, 245, 245),
+            diff_header_fg: Color::Rgb(30, 100, 200),
+            selection_bg: Color::Rgb(200, 215, 255),
+            selection_fg: Color::Rgb(20, 20, 40),
+            border: Color::Rgb(180, 180, 190),
+            border_focused: Color::Rgb(80, 130, 220),
+            title_fg: Color::Rgb(40, 80, 160),
+            dim_text: Color::Rgb(150, 150, 150),
+            normal_bg: Color::Rgb(255, 255, 255),
+            light_bg: Color::Rgb(245, 245, 245),
+            file_entry: Color::Rgb(50, 50, 50),
+            file_entry_staged: Color::Rgb(30, 140, 30),
+            file_entry_modified: Color::Rgb(180, 140, 30),
+            file_entry_untracked: Color::Rgb(150, 150, 150),
+            commit_hash: Color::Rgb(180, 140, 40),
+            commit_msg: Color::Rgb(50, 50, 50),
+            commit_author: Color::Rgb(60, 100, 180),
+            commit_date: Color::Rgb(140, 140, 140),
+            stash_msg: Color::Rgb(140, 80, 180),
+            help_key: Color::Rgb(40, 80, 200),
+            help_desc: Color::Rgb(120, 120, 120),
+            mode_indicator_bg: Color::Rgb(220, 240, 220),
+            status_added: Color::Rgb(30, 160, 30),
+            status_deleted: Color::Rgb(200, 40, 40),
+            status_modified: Color::Rgb(200, 160, 30),
+        }
+    }
+
     pub fn from_path(path: &Path) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         Self::from_ron(&content)
