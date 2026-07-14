@@ -38,6 +38,8 @@ pub struct Theme {
     pub status_added: Color,
     pub status_deleted: Color,
     pub status_modified: Color,
+    pub diff_delete_highlight: Style,
+    pub diff_add_highlight: Style,
 }
 
 fn parse_color(s: &str) -> Option<Color> {
@@ -137,10 +139,10 @@ impl Theme {
             tab_inactive: Color::DarkGray,
             tab_bar_bg: Color::Reset,
             diff_add_fg: Color::Green,
-            diff_add_bg: Color::Reset,
+            diff_add_bg: Color::Rgb(0x00, 0x22, 0x00),
             diff_delete_fg: Color::Red,
-            diff_delete_bg: Color::Reset,
-            diff_context_bg: Color::Reset,
+            diff_delete_bg: Color::Rgb(0x22, 0x00, 0x00),
+            diff_context_bg: Color::Rgb(0x14, 0x14, 0x14),
             diff_header_fg: Color::Blue,
             selection_bg: Color::Blue,
             selection_fg: Color::White,
@@ -165,6 +167,8 @@ impl Theme {
             status_added: Color::LightGreen,
             status_deleted: Color::LightRed,
             status_modified: Color::Yellow,
+            diff_delete_highlight: Style::default().fg(Color::LightRed).bg(Color::Rgb(0x3a, 0x00, 0x00)),
+            diff_add_highlight: Style::default().fg(Color::LightGreen).bg(Color::Rgb(0x00, 0x30, 0x00)),
         }
     }
 
@@ -174,10 +178,10 @@ impl Theme {
             tab_inactive: Color::DarkGray,
             tab_bar_bg: Color::Reset,
             diff_add_fg: Color::Green,
-            diff_add_bg: Color::Reset,
+            diff_add_bg: Color::Rgb(0xe8, 0xff, 0xe8),
             diff_delete_fg: Color::Red,
-            diff_delete_bg: Color::Reset,
-            diff_context_bg: Color::Reset,
+            diff_delete_bg: Color::Rgb(0xff, 0xe8, 0xe8),
+            diff_context_bg: Color::Rgb(0xf5, 0xf5, 0xf5),
             diff_header_fg: Color::Blue,
             selection_bg: Color::Blue,
             selection_fg: Color::White,
@@ -202,6 +206,8 @@ impl Theme {
             status_added: Color::Green,
             status_deleted: Color::Red,
             status_modified: Color::Yellow,
+            diff_delete_highlight: Style::default().fg(Color::Red).bg(Color::Rgb(0xff, 0xd0, 0xd0)),
+            diff_add_highlight: Style::default().fg(Color::Green).bg(Color::Rgb(0xd0, 0xff, 0xd0)),
         }
     }
 
@@ -286,7 +292,7 @@ impl Theme {
 
     // --- Diff ---
     pub fn diff_add(&self, selected: bool) -> Style {
-        let base = Style::default().fg(self.diff_add_fg);
+        let base = Style::default().fg(self.diff_add_fg).bg(self.diff_add_bg);
         if selected {
             Style::default().fg(self.selection_fg).bg(self.selection_bg)
         } else {
@@ -294,7 +300,7 @@ impl Theme {
         }
     }
     pub fn diff_delete(&self, selected: bool) -> Style {
-        let base = Style::default().fg(self.diff_delete_fg);
+        let base = Style::default().fg(self.diff_delete_fg).bg(self.diff_delete_bg);
         if selected {
             Style::default().fg(self.selection_fg).bg(self.selection_bg)
         } else {

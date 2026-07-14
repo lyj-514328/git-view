@@ -25,10 +25,10 @@ impl DiffEngine {
         theme: &Theme,
     ) -> Vec<Span<'static>> {
         let base_style = match line_type {
-            crate::git::DiffLineType::Add => theme.diff_add,
-            crate::git::DiffLineType::Delete => theme.diff_delete,
-            crate::git::DiffLineType::Context => theme.diff_context,
-            crate::git::DiffLineType::Header => theme.diff_header,
+            crate::git::DiffLineType::Add => theme.diff_add(false),
+            crate::git::DiffLineType::Delete => theme.diff_delete(false),
+            crate::git::DiffLineType::Context => theme.diff_context(false),
+            crate::git::DiffLineType::Header => theme.diff_header(),
         };
 
         Self::syntax_highlight(line, extension, base_style)
@@ -51,14 +51,14 @@ impl DiffEngine {
         let minus_spans = Self::annotated_line_to_spans(
             &annotated_minus[0],
             extension,
-            theme.diff_delete,
+            theme.diff_delete(false),
             theme.diff_delete_highlight,
             theme,
         );
         let plus_spans = Self::annotated_line_to_spans(
             &annotated_plus[0],
             extension,
-            theme.diff_add,
+            theme.diff_add(false),
             theme.diff_add_highlight,
             theme,
         );
@@ -180,7 +180,7 @@ impl DiffEngine {
             let bg = if diff_style.bg.is_some() {
                 diff_style.bg.unwrap()
             } else {
-                theme.diff_context.bg.unwrap_or(ratatui::style::Color::Reset)
+                theme.diff_context(false).bg.unwrap_or(ratatui::style::Color::Reset)
             };
 
             let final_style = Style::default().fg(fg).bg(bg);
@@ -193,7 +193,7 @@ impl DiffEngine {
             let bg = if diff_style.bg.is_some() {
                 diff_style.bg.unwrap()
             } else {
-                theme.diff_context.bg.unwrap_or(ratatui::style::Color::Reset)
+                theme.diff_context(false).bg.unwrap_or(ratatui::style::Color::Reset)
             };
             spans.push(Span::styled(
                 text.to_string(),
