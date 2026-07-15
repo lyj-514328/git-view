@@ -101,6 +101,9 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                 KeyCode::Char('d') => {
                     app.toggle_diff();
                 }
+                KeyCode::Char('f') => {
+                    app.toggle_diff_fullscreen();
+                }
                 KeyCode::Char('m') => {
                     app.toggle_diff_mode();
                 }

@@ -27,6 +27,7 @@ pub struct App {
     pub diff_view: DiffView,
     pub theme: Theme,
     pub show_diff: bool,
+    pub diff_fullscreen: bool,
     pub show_help: bool,
     pub diff_mode: DiffViewMode,
 }
@@ -43,6 +44,7 @@ impl App {
             diff_view: DiffView::new(),
             theme,
             show_diff: false,
+            diff_fullscreen: false,
             show_help: false,
             diff_mode: DiffViewMode::SideBySide,
         };
@@ -83,6 +85,10 @@ impl App {
         if self.show_diff {
             self.load_diff_for_selection();
         }
+    }
+
+    pub fn toggle_diff_fullscreen(&mut self) {
+        self.diff_fullscreen = !self.diff_fullscreen;
     }
 
     pub fn toggle_diff_mode(&mut self) {
@@ -275,10 +281,17 @@ impl App {
         let content_area = main_layout[1];
 
         if self.show_diff {
-            let split = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
-                .split(content_area);
+            let split = if self.diff_fullscreen {
+                Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Length(0), Constraint::Min(1)])
+                    .split(content_area)
+            } else {
+                Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                    .split(content_area)
+            };
 
             self.render_tab_content(f, split[0]);
             self.diff_view.render(f, split[1], &self.theme);
@@ -288,11 +301,12 @@ impl App {
 
         let mode_text = if self.show_diff {
             format!(
-                " [{}] | q:quit | h:help | d:toggle diff | m:toggle mode({}) | \u{2191}\u{2193}:scroll ",
+                " [{}]{} | q:quit | h:help | d:toggle diff | f:fullscreen | m:toggle mode({}) | \u{2191}\u{2193}:scroll ",
                 match self.diff_mode {
                     DiffViewMode::Inline => "inline",
                     DiffViewMode::SideBySide => "side-by-side",
                 },
+                if self.diff_fullscreen { " [F]" } else { "" },
                 match self.diff_mode {
                     DiffViewMode::Inline => "inline",
                     DiffViewMode::SideBySide => "side-by-side",

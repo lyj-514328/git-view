@@ -18,6 +18,7 @@ pub struct LogTab {
     pub files: Vec<String>,
     pub file_selected: usize,
     pub file_scroll: usize,
+    pub info_scroll: usize,
 }
 
 impl LogTab {
@@ -30,6 +31,7 @@ impl LogTab {
             files: Vec::new(),
             file_selected: 0,
             file_scroll: 0,
+            info_scroll: 0,
         }
     }
 
@@ -43,6 +45,7 @@ impl LogTab {
         self.files.clear();
         self.file_selected = 0;
         self.file_scroll = 0;
+        self.info_scroll = 0;
     }
 
     pub fn move_down(&mut self) {
@@ -52,6 +55,7 @@ impl LogTab {
 
     pub fn move_up(&mut self) {
         self.selected = self.selected.saturating_sub(1);
+        self.info_scroll = 0;
     }
 
     pub fn current_commit_id(&self) -> Option<String> {
@@ -64,6 +68,7 @@ impl LogTab {
             self.files.clear();
             self.file_selected = 0;
             self.file_scroll = 0;
+            self.info_scroll = 0;
         } else {
             if let Some(commit_id) = self.current_commit_id() {
                 if let Ok(diffs) = repo.get_commit_diff(&commit_id) {
@@ -79,6 +84,7 @@ impl LogTab {
                     self.files = files;
                     self.file_selected = 0;
                     self.file_scroll = 0;
+                    self.info_scroll = 0;
                     self.show_files = true;
                     return;
                 }
@@ -91,6 +97,7 @@ impl LogTab {
         self.files.clear();
         self.file_selected = 0;
         self.file_scroll = 0;
+        self.info_scroll = 0;
     }
 
     pub fn file_move_down(&mut self) {
@@ -110,11 +117,16 @@ impl LogTab {
         if self.show_files {
             let split = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .constraints([
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                ])
                 .split(area);
 
             self.render_commit_list(f, split[0], theme);
-            self.render_file_list(f, split[1], theme);
+            self.render_commit_info(f, split[1], theme);
+            self.render_file_list(f, split[2], theme);
         } else {
             self.render_commit_list(f, area, theme);
         }
@@ -137,7 +149,7 @@ impl LogTab {
             let dt = Local
                 .timestamp_opt(commit.time, 0)
                 .latest()
-                .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                .map(|t| t.format("%m-%d %H:%M").to_string())
                 .unwrap_or_default();
 
             let hash_style = theme.commit_hash(is_selected);
@@ -170,6 +182,56 @@ impl LogTab {
             .collect();
 
         f.render_widget(Paragraph::new(visible), inner);
+    }
+
+    fn render_commit_info(&self, f: &mut Frame, area: Rect, theme: &Theme) {
+        let block = Block::default()
+            .title(" Details ")
+            .borders(Borders::ALL)
+            .border_style(theme.border_style());
+        let inner = block.inner(area);
+        f.render_widget(block, area);
+
+        if let Some(commit) = self.commits.get(self.selected) {
+            let dt = Local
+                .timestamp_opt(commit.time, 0)
+                .latest()
+                .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or_default();
+
+            let label_style = theme.dim_text();
+            let value_style = Style::default().fg(theme.commit_hash);
+
+            let lines = vec![
+                Line::from(vec![
+                    Span::styled("Author: ", label_style),
+                    Span::styled(commit.author.clone(), value_style),
+                ]),
+                Line::from(vec![
+                    Span::styled("Date:   ", label_style),
+                    Span::styled(dt, value_style),
+                ]),
+                Line::from(vec![
+                    Span::styled("Hash:   ", label_style),
+                    Span::styled(commit.id.clone(), value_style),
+                ]),
+                Line::from(Span::styled("", theme.normal())),
+                Line::from(Span::styled(
+                    commit.summary.clone(),
+                    Style::default().fg(theme.commit_msg),
+                )),
+            ];
+
+            f.render_widget(Paragraph::new(lines), inner);
+        } else {
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    " (no commit selected)",
+                    theme.dim_text(),
+                ))),
+                inner,
+            );
+        }
     }
 
     fn render_file_list(&self, f: &mut Frame, area: Rect, theme: &Theme) {
