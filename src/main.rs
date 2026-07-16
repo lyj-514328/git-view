@@ -10,6 +10,8 @@ mod status_tab;
 use crate::status_tab::StatusFocus;
 mod theme;
 
+use crate::stashes_tab::StashDepth;
+
 use crate::app::App;
 use crate::theme::Theme;
 use anyhow::Result;
@@ -117,8 +119,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                                 app.log_tab_enter();
                             }
                         }
-                        _ => {
-                            app.toggle_diff();
+                        app::Tab::Stashes => {
+                            if app.stashes_tab.depth >= StashDepth::FilesDiff {
+                                app.stash_tab_back();
+                            } else {
+                                app.stash_tab_enter();
+                            }
                         }
                     }
                 }
@@ -190,8 +196,8 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                         }
                     } else if app.current_tab == app::Tab::Log {
                         app.log_tab_enter();
-                    } else {
-                        app.next_tab();
+                    } else if app.current_tab == app::Tab::Stashes {
+                        app.stash_tab_enter();
                     }
                 }
                 KeyCode::Left => {
@@ -202,10 +208,6 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                         } else {
                             app.status_tab.focus_left();
                         }
-                    } else if app.current_tab == app::Tab::Log {
-                        app.log_tab_back();
-                    } else {
-                        app.prev_tab();
                     }
                 }
                 KeyCode::Esc => {
@@ -222,8 +224,10 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                         app.log_tab_back();
                     } else if app.show_diff {
                         app.toggle_diff();
-                    } else if matches!(app.current_tab, app::Tab::Stashes) && app.stashes_tab.show_files {
-                        app.stashes_tab.close_files();
+                    } else if app.current_tab == app::Tab::Stashes
+                        && app.stashes_tab.depth != StashDepth::List
+                    {
+                        app.stash_tab_back();
                     }
                 }
                 KeyCode::Enter => {
@@ -241,11 +245,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                             app.log_tab_enter();
                         }
                         app::Tab::Stashes => {
-                            if !app.stashes_tab.show_files {
-                                app.stashes_tab.toggle_files(&mut app.repo);
-                            } else {
-                                app.toggle_diff();
-                            }
+                            app.stash_tab_enter();
                         }
                     }
                 }

@@ -1,7 +1,7 @@
 use crate::diff::{DiffView, DiffViewMode};
 use crate::git::GitRepo;
 use crate::log_tab::{self, LogTab};
-use crate::stashes_tab::StashesTab;
+use crate::stashes_tab::{self, StashesTab};
 use crate::status_tab::{StatusFocus, StatusTab};
 use crate::theme::Theme;
 use ratatui::{
@@ -55,7 +55,10 @@ impl App {
 
     pub fn refresh_current_tab(&mut self) {
         match self.current_tab {
-            Tab::Status => self.status_tab.refresh(&self.repo),
+            Tab::Status => {
+                self.status_tab.refresh(&self.repo);
+                self.load_diff_for_selection();
+            }
             Tab::Log => self.log_tab.refresh(&self.repo),
             Tab::Stashes => self.stashes_tab.refresh(&mut self.repo),
         }
@@ -107,10 +110,30 @@ impl App {
         self.log_tab.back();
     }
 
+    pub fn stash_tab_enter(&mut self) {
+        let prev = self.stashes_tab.depth;
+        if self.stashes_tab.enter() {
+            match (prev, self.stashes_tab.depth) {
+                (stashes_tab::StashDepth::List, stashes_tab::StashDepth::Details) => {
+                    self.stashes_tab.load_files(&mut self.repo);
+                }
+                (_, stashes_tab::StashDepth::FilesDiff) => {
+                    self.stashes_tab.load_diff_for_file(&mut self.diff_view, &mut self.repo);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn stash_tab_back(&mut self) {
+        self.stashes_tab.back();
+    }
+
     pub fn is_any_diff_active(&self) -> bool {
         self.show_diff
             || (self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff)
             || (self.current_tab == Tab::Log && self.log_tab.depth >= log_tab::LogDepth::FilesDiff)
+            || (self.current_tab == Tab::Stashes && self.stashes_tab.depth >= stashes_tab::StashDepth::FilesDiff)
     }
 
     pub fn toggle_diff_fullscreen(&mut self) {
@@ -136,6 +159,8 @@ impl App {
             self.diff_view.scroll_down(1);
         } else if self.current_tab == Tab::Log && self.log_tab.depth == log_tab::LogDepth::Diff {
             self.diff_view.scroll_down(1);
+        } else if self.current_tab == Tab::Stashes && self.stashes_tab.depth == stashes_tab::StashDepth::Diff {
+            self.diff_view.scroll_down(1);
         } else {
             match self.current_tab {
                 Tab::Status => {
@@ -152,10 +177,12 @@ impl App {
                     }
                 }
                 Tab::Stashes => {
-                    if self.stashes_tab.show_files {
-                        self.stashes_tab.file_move_down();
-                    } else {
-                        self.stashes_tab.move_down();
+                    self.stashes_tab.move_down();
+                    if self.stashes_tab.depth == stashes_tab::StashDepth::Details {
+                        self.stashes_tab.load_files(&mut self.repo);
+                    }
+                    if self.stashes_tab.depth == stashes_tab::StashDepth::FilesDiff {
+                        self.stashes_tab.load_diff_for_file(&mut self.diff_view, &mut self.repo);
                     }
                 }
             }
@@ -168,6 +195,8 @@ impl App {
         } else if self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff {
             self.diff_view.scroll_up(1);
         } else if self.current_tab == Tab::Log && self.log_tab.depth == log_tab::LogDepth::Diff {
+            self.diff_view.scroll_up(1);
+        } else if self.current_tab == Tab::Stashes && self.stashes_tab.depth == stashes_tab::StashDepth::Diff {
             self.diff_view.scroll_up(1);
         } else {
             match self.current_tab {
@@ -185,10 +214,12 @@ impl App {
                     }
                 }
                 Tab::Stashes => {
-                    if self.stashes_tab.show_files {
-                        self.stashes_tab.file_move_up();
-                    } else {
-                        self.stashes_tab.move_up();
+                    self.stashes_tab.move_up();
+                    if self.stashes_tab.depth == stashes_tab::StashDepth::Details {
+                        self.stashes_tab.load_files(&mut self.repo);
+                    }
+                    if self.stashes_tab.depth == stashes_tab::StashDepth::FilesDiff {
+                        self.stashes_tab.load_diff_for_file(&mut self.diff_view, &mut self.repo);
                     }
                 }
             }
@@ -211,26 +242,7 @@ impl App {
                 self.diff_view.clear();
             }
             Tab::Stashes => {
-                if self.stashes_tab.show_files {
-                    if let Some(path) = self.stashes_tab.current_file_path() {
-                        if let Some(index) = self.stashes_tab.current_stash_index() {
-                            if let Ok(diffs) = self.repo.get_stash_diff(index) {
-                                for diff in diffs {
-                                    let diff_path = if !diff.new_path.is_empty() {
-                                        diff.new_path.clone()
-                                    } else {
-                                        diff.old_path.clone()
-                                    };
-                                    if diff_path == path {
-                                        self.diff_view.set_diff(diff);
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                self.diff_view.clear();
+                self.stashes_tab.load_diff_for_file(&mut self.diff_view, &mut self.repo);
             }
         }
     }
@@ -420,7 +432,24 @@ impl App {
                     }
                 }
             }
-            Tab::Stashes => self.stashes_tab.render(f, area, &self.theme),
+            Tab::Stashes => {
+                match self.stashes_tab.depth {
+                    stashes_tab::StashDepth::List | stashes_tab::StashDepth::Details => {
+                        self.stashes_tab.render(f, area, &self.theme);
+                    }
+                    stashes_tab::StashDepth::FilesDiff => {
+                        let split = Layout::default()
+                            .direction(Direction::Horizontal)
+                            .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                            .split(area);
+                        self.stashes_tab.render(f, split[0], &self.theme);
+                        self.diff_view.render(f, split[1], &self.theme);
+                    }
+                    stashes_tab::StashDepth::Diff => {
+                        self.diff_view.render(f, area, &self.theme);
+                    }
+                }
+            }
         }
     }
 

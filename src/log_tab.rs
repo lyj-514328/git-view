@@ -320,7 +320,7 @@ impl LogTab {
         let mut lines: Vec<Line> = Vec::new();
 
         for (i, file) in self.files.iter().enumerate() {
-            let is_selected = i == self.file_selected;
+            let is_selected = i == self.file_selected && focused;
             let marker = if is_selected { ">" } else { " " };
             let style = if is_selected {
                 theme.selected()
