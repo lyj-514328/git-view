@@ -2,7 +2,7 @@ use crate::diff::{DiffView, DiffViewMode};
 use crate::git::GitRepo;
 use crate::log_tab::LogTab;
 use crate::stashes_tab::StashesTab;
-use crate::status_tab::StatusTab;
+use crate::status_tab::{StatusFocus, StatusTab};
 use crate::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -12,6 +12,7 @@ use ratatui::{
 };
 use std::path::Path;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Status,
     Log,
@@ -87,6 +88,10 @@ impl App {
         }
     }
 
+    pub fn is_any_diff_active(&self) -> bool {
+        self.show_diff || (self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff)
+    }
+
     pub fn toggle_diff_fullscreen(&mut self) {
         self.diff_fullscreen = !self.diff_fullscreen;
     }
@@ -106,9 +111,14 @@ impl App {
     pub fn move_down(&mut self) {
         if self.show_diff {
             self.diff_view.scroll_down(1);
+        } else if self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff {
+            self.diff_view.scroll_down(1);
         } else {
             match self.current_tab {
-                Tab::Status => self.status_tab.move_down(),
+                Tab::Status => {
+                    self.status_tab.move_down();
+                    self.load_diff_for_selection();
+                }
                 Tab::Log => {
                     if self.log_tab.show_files {
                         self.log_tab.file_move_down();
@@ -130,9 +140,14 @@ impl App {
     pub fn move_up(&mut self) {
         if self.show_diff {
             self.diff_view.scroll_up(1);
+        } else if self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff {
+            self.diff_view.scroll_up(1);
         } else {
             match self.current_tab {
-                Tab::Status => self.status_tab.move_up(),
+                Tab::Status => {
+                    self.status_tab.move_up();
+                    self.load_diff_for_selection();
+                }
                 Tab::Log => {
                     if self.log_tab.show_files {
                         self.log_tab.file_move_up();
@@ -151,7 +166,7 @@ impl App {
         }
     }
 
-    fn load_diff_for_selection(&mut self) {
+    pub fn load_diff_for_selection(&mut self) {
         match self.current_tab {
             Tab::Status => {
                 if let Some(path) = self.status_tab.current_file() {
@@ -294,7 +309,19 @@ impl App {
 
         let content_area = main_layout[1];
 
-        if self.show_diff {
+        if self.current_tab == Tab::Status {
+            if self.status_tab.focus == StatusFocus::Diff && self.diff_fullscreen {
+                self.diff_view.render(f, content_area, &self.theme);
+            } else {
+                let split = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                    .split(content_area);
+
+                self.status_tab.render(f, split[0], &self.theme);
+                self.diff_view.render(f, split[1], &self.theme);
+            }
+        } else if self.show_diff {
             let split = if self.diff_fullscreen {
                 Layout::default()
                     .direction(Direction::Horizontal)
@@ -303,7 +330,7 @@ impl App {
             } else {
                 Layout::default()
                     .direction(Direction::Horizontal)
-                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                    .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
                     .split(content_area)
             };
 
@@ -313,7 +340,24 @@ impl App {
             self.render_tab_content(f, content_area);
         }
 
-        let mode_text = if self.show_diff {
+        let mode_text = if self.current_tab == Tab::Status {
+            if self.status_tab.focus == StatusFocus::Diff {
+                format!(
+                    " [{}]{} | q:quit | h:help | f:fullscreen | m:toggle mode({}) | \u{2191}\u{2193}:scroll ",
+                    match self.diff_mode {
+                        DiffViewMode::Inline => "inline",
+                        DiffViewMode::SideBySide => "side-by-side",
+                    },
+                    if self.diff_fullscreen { " [F]" } else { "" },
+                    match self.diff_mode {
+                        DiffViewMode::Inline => "inline",
+                        DiffViewMode::SideBySide => "side-by-side",
+                    },
+                )
+            } else {
+                " q:quit | h:help | \u{2191}\u{2193}:navigate | \u{2190}\u{2192}:switch panel | Enter:open diff | 1-3:goto tab ".to_string()
+            }
+        } else if self.is_any_diff_active() {
             format!(
                 " [{}]{} | q:quit | h:help | d:toggle diff | f:fullscreen | m:toggle mode({}) | \u{2191}\u{2193}:scroll ",
                 match self.diff_mode {

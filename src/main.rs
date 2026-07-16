@@ -7,6 +7,7 @@ mod git;
 mod log_tab;
 mod stashes_tab;
 mod status_tab;
+use crate::status_tab::StatusFocus;
 mod theme;
 
 use crate::app::App;
@@ -99,10 +100,27 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                     app.toggle_help();
                 }
                 KeyCode::Char('d') => {
-                    app.toggle_diff();
+                    match app.current_tab {
+                        app::Tab::Status => {
+                            if app.status_tab.focus == StatusFocus::Diff {
+                                app.status_tab.focus = StatusFocus::Unstaged;
+                                app.diff_fullscreen = false;
+                            } else if app.status_tab.current_file().is_some() {
+                                app.status_tab.focus = StatusFocus::Diff;
+                                app.diff_fullscreen = true;
+                            }
+                        }
+                        _ => {
+                            app.toggle_diff();
+                        }
+                    }
                 }
                 KeyCode::Char('f') => {
-                    app.toggle_diff_fullscreen();
+                    if app.current_tab == app::Tab::Status && app.status_tab.focus == StatusFocus::Diff {
+                        app.diff_fullscreen = !app.diff_fullscreen;
+                    } else {
+                        app.toggle_diff_fullscreen();
+                    }
                 }
                 KeyCode::Char('m') => {
                     app.toggle_diff_mode();
@@ -110,16 +128,19 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                 KeyCode::Char('1') => {
                     app.current_tab = app::Tab::Status;
                     app.show_diff = false;
+                    app.diff_fullscreen = false;
                     app.refresh_current_tab();
                 }
                 KeyCode::Char('2') => {
                     app.current_tab = app::Tab::Log;
                     app.show_diff = false;
+                    app.diff_fullscreen = false;
                     app.refresh_current_tab();
                 }
                 KeyCode::Char('3') => {
                     app.current_tab = app::Tab::Stashes;
                     app.show_diff = false;
+                    app.diff_fullscreen = false;
                     app.refresh_current_tab();
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -129,22 +150,22 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                     app.move_down();
                 }
                 KeyCode::PageUp => {
-                    if app.show_diff {
+                    if app.is_any_diff_active() {
                         app.diff_view.page_up();
                     }
                 }
                 KeyCode::PageDown => {
-                    if app.show_diff {
+                    if app.is_any_diff_active() {
                         app.diff_view.page_down();
                     }
                 }
                 KeyCode::Home => {
-                    if app.show_diff {
+                    if app.is_any_diff_active() {
                         app.diff_view.go_to_top();
                     }
                 }
                 KeyCode::End => {
-                    if app.show_diff {
+                    if app.is_any_diff_active() {
                         app.diff_view.go_to_end();
                     }
                 }
@@ -155,14 +176,35 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                     app.prev_tab();
                 }
                 KeyCode::Right => {
-                    app.next_tab();
+                    if app.current_tab == app::Tab::Status {
+                        app.status_tab.focus_right();
+                        if app.status_tab.focus == StatusFocus::Diff {
+                            app.diff_fullscreen = true;
+                        }
+                    } else {
+                        app.next_tab();
+                    }
                 }
                 KeyCode::Left => {
-                    app.prev_tab();
+                    if app.current_tab == app::Tab::Status {
+                        if app.status_tab.focus == StatusFocus::Diff {
+                            app.status_tab.focus = StatusFocus::Unstaged;
+                            app.diff_fullscreen = false;
+                        } else {
+                            app.status_tab.focus_left();
+                        }
+                    } else {
+                        app.prev_tab();
+                    }
                 }
                 KeyCode::Esc => {
                     if app.show_help {
                         app.toggle_help();
+                    } else if app.current_tab == app::Tab::Status
+                        && app.status_tab.focus == StatusFocus::Diff
+                    {
+                        app.status_tab.focus = StatusFocus::Unstaged;
+                        app.diff_fullscreen = false;
                     } else if app.show_diff {
                         app.toggle_diff();
                     } else if matches!(app.current_tab, app::Tab::Log) && app.log_tab.show_files {
@@ -172,12 +214,30 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                     }
                 }
                 KeyCode::Enter => {
-                    if matches!(app.current_tab, app::Tab::Log) && !app.log_tab.show_files {
-                        app.log_tab.toggle_files(&app.repo);
-                    } else if matches!(app.current_tab, app::Tab::Stashes) && !app.stashes_tab.show_files {
-                        app.stashes_tab.toggle_files(&mut app.repo);
-                    } else {
-                        app.toggle_diff();
+                    match app.current_tab {
+                        app::Tab::Status => {
+                            if app.status_tab.focus == StatusFocus::Diff {
+                                app.status_tab.focus = StatusFocus::Unstaged;
+                                app.diff_fullscreen = false;
+                            } else if app.status_tab.current_file().is_some() {
+                                app.status_tab.focus = StatusFocus::Diff;
+                                app.diff_fullscreen = true;
+                            }
+                        }
+                        app::Tab::Log => {
+                            if !app.log_tab.show_files {
+                                app.log_tab.toggle_files(&app.repo);
+                            } else {
+                                app.toggle_diff();
+                            }
+                        }
+                        app::Tab::Stashes => {
+                            if !app.stashes_tab.show_files {
+                                app.stashes_tab.toggle_files(&mut app.repo);
+                            } else {
+                                app.toggle_diff();
+                            }
+                        }
                     }
                 }
                 _ => {
