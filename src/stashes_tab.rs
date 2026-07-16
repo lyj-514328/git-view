@@ -178,7 +178,7 @@ impl StashesTab {
                     .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
                     .split(area);
 
-                self.render_stash_list(f, split[0], theme, false);
+                self.render_stash_list(f, split[0], theme, true);
                 let right = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])

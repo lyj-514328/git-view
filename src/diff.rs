@@ -24,7 +24,7 @@ pub struct DiffView {
     pub scroll: usize,
     pub selected_line: usize,
     pub mode: DiffViewMode,
-    pub focused: bool,
+    pub focused: Cell<bool>,
     visible_height: Cell<usize>,
     total_rendered_lines: Cell<usize>,
 }
@@ -36,7 +36,7 @@ impl DiffView {
             scroll: 0,
             selected_line: 0,
             mode: DiffViewMode::SideBySide,
-            focused: false,
+            focused: Cell::new(false),
             visible_height: Cell::new(0),
             total_rendered_lines: Cell::new(0),
         }
@@ -119,7 +119,7 @@ impl DiffView {
                 file_diff.new_path
             ))
             .borders(Borders::ALL)
-            .border_style(if self.focused {
+            .border_style(if self.focused.get() {
                 theme.border_focused_style()
             } else {
                 theme.border_style()

@@ -250,6 +250,12 @@ impl App {
     pub fn render(&self, f: &mut Frame) {
         let area = f.area();
 
+        let diff_focused = (self.current_tab == Tab::Status && self.status_tab.focus == StatusFocus::Diff)
+            || self.show_diff
+            || (self.current_tab == Tab::Log && self.log_tab.depth == log_tab::LogDepth::Diff)
+            || (self.current_tab == Tab::Stashes && self.stashes_tab.depth == stashes_tab::StashDepth::Diff);
+        self.diff_view.focused.set(diff_focused);
+
         let tab_titles = vec![
             " Status [1] ",
             " Log [2] ",
