@@ -8,6 +8,7 @@ mod log_tab;
 mod stashes_tab;
 mod status_tab;
 use crate::status_tab::StatusFocus;
+mod args;
 mod theme;
 
 use crate::stashes_tab::StashDepth;
@@ -15,8 +16,10 @@ use crate::stashes_tab::StashDepth;
 use std::time::Duration;
 
 use crate::app::App;
+use crate::args::CliArgs;
 use crate::theme::Theme;
 use anyhow::Result;
+use clap::Parser;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind,
@@ -25,31 +28,13 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{io, path::Path};
+use std::io;
 use terminal_colorsaurus::{color_scheme, QueryOptions};
 
 fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    let mut repo_path = std::env::current_dir()?;
-    let mut theme_path = None;
+    let args = CliArgs::parse();
 
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--theme" | "-t" => {
-                i += 1;
-                theme_path = args.get(i).map(|s| Path::new(s).to_path_buf());
-            }
-            _ => {
-                if !args[i].starts_with('-') {
-                    repo_path = Path::new(&args[i]).to_path_buf();
-                }
-            }
-        }
-        i += 1;
-    }
-
-    let theme = if let Some(path) = &theme_path {
+    let theme = if let Some(path) = &args.theme {
         Theme::from_path(path).unwrap_or_else(|e| {
             eprintln!("Warning: failed to load theme from {:?}: {e}", path);
             eprintln!("Using default theme");
@@ -61,7 +46,7 @@ fn main() -> Result<()> {
 
     diff_engine::init_bat_assets();
 
-    let app = App::new(&repo_path, theme)?;
+    let app = App::new(&args.repo_path, theme)?;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
