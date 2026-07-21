@@ -87,7 +87,7 @@ pub struct GitRepo {
 
 impl GitRepo {
     pub fn open(path: &Path) -> Result<Self> {
-        let repo = Repository::open(path)
+        let repo = Repository::discover(path)
             .with_context(|| format!("Failed to open git repository at {:?}", path))?;
         Ok(Self { repo })
     }
