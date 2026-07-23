@@ -848,18 +848,20 @@ fn wrap_and_push(
             current_width += span_width;
         } else {
             let available = max_width.saturating_sub(current_width);
+            let mut chars_consumed: usize = 0;
             if available > 0 {
                 let mut truncated = String::new();
                 let mut w = 0;
                 for c in s.chars() {
                     let cw = UnicodeWidthStr::width(c.to_string().as_str());
-                    if w + cw > available {
-                        truncated.push('↴');
+                    if w + cw + 1 > available && chars_consumed > 0 {
                         break;
                     }
                     truncated.push(c);
                     w += cw;
+                    chars_consumed += 1;
                 }
+                truncated.push('↴');
                 line_buf.push(Span::styled(truncated, span.style));
             }
             fill_rest_of_line(&mut line_buf, max_width, fill_bg);
@@ -869,12 +871,10 @@ fn wrap_and_push(
             line_buf.push(Span::styled("    │    │ ".to_string(), cont_column_style));
             let mut cont_width = UnicodeWidthStr::width("    │    │ ");
 
-            let rest_start = available;
-            if rest_start < span_width {
-                let rest_text = s.chars().skip(rest_start).collect::<String>();
-                let rest_width = UnicodeWidthStr::width(rest_text.as_str());
+            let rest_text = s.chars().skip(chars_consumed).collect::<String>();
+            if !rest_text.is_empty() {
+                cont_width += UnicodeWidthStr::width(rest_text.as_str());
                 line_buf.push(Span::styled(rest_text, span.style));
-                cont_width += rest_width;
             }
             current_width = cont_width;
         }
@@ -993,14 +993,14 @@ fn chunk_spans(spans: &[Span<'static>], content_width: usize) -> Vec<Vec<Span<'s
                 let mut chars_consumed: usize = 0;
                 for c in remaining.chars() {
                     let cw = UnicodeWidthStr::width(c.to_string().as_str());
-                    if w + cw > available {
-                        truncated.push('↴');
+                    if w + cw + 1 > available && chars_consumed > 0 {
                         break;
                     }
                     truncated.push(c);
                     w += cw;
                     chars_consumed += 1;
                 }
+                truncated.push('↴');
                 current_chunk.push(Span::styled(truncated, span.style));
                 chunks.push(current_chunk);
                 current_chunk = Vec::new();
@@ -1008,7 +1008,7 @@ fn chunk_spans(spans: &[Span<'static>], content_width: usize) -> Vec<Vec<Span<'s
 
                 if chars_consumed > 0 {
                     let mut iter = remaining.chars();
-                    for _ in 0..chars_consumed.saturating_sub(1) {
+                    for _ in 0..chars_consumed {
                         iter.next();
                     }
                     remaining = iter.as_str();
