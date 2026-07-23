@@ -719,10 +719,12 @@ fn flush_buffer_sbs(
                 theme,
             );
             let left_prefix_spans = build_prefix_spans('│', line.old_lineno.unwrap_or(0), theme.line_number_minus_style(), column_style);
-            let left_len_before = left.len();
-            wrap_and_push(left, &left_prefix_spans, &spans, left_width as usize, column_style);
-            let left_line_count = left.len() - left_len_before;
-            fill_empty_side(right, right_width as usize, &empty_prefix, left_line_count, column_style, theme);
+            let right_prefix_spans = vec![Span::styled(empty_prefix.to_string(), column_style)];
+            let left_content_width = (left_width as usize).saturating_sub(left_prefix_spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum::<usize>());
+            let right_content_width = (right_width as usize).saturating_sub(right_prefix_spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum::<usize>());
+            let row_count = chunk_spans(&spans, left_content_width).len();
+            let indicator = build_empty_indicator(right_content_width, row_count, theme);
+            wrap_and_push_pair(left, right, &left_prefix_spans, &right_prefix_spans, &spans, &indicator, left_width as usize, right_width as usize, column_style);
         } else {
             let line = adds[i];
             let spans = DiffEngine::highlight_line(
@@ -732,44 +734,37 @@ fn flush_buffer_sbs(
                 extension,
                 theme,
             );
+            let left_prefix_spans = vec![Span::styled(empty_prefix.to_string(), column_style)];
             let right_prefix_spans = build_prefix_spans('│', line.new_lineno.unwrap_or(0), theme.line_number_plus_style(), column_style);
-            let right_len_before = right.len();
-            wrap_and_push(right, &right_prefix_spans, &spans, right_width as usize, column_style);
-            let right_line_count = right.len() - right_len_before;
-            fill_empty_side(left, left_width as usize, &empty_prefix, right_line_count, column_style, theme);
+            let left_content_width = (left_width as usize).saturating_sub(left_prefix_spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum::<usize>());
+            let right_content_width = (right_width as usize).saturating_sub(right_prefix_spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum::<usize>());
+            let row_count = chunk_spans(&spans, right_content_width).len();
+            let indicator = build_empty_indicator(left_content_width, row_count, theme);
+            wrap_and_push_pair(left, right, &left_prefix_spans, &right_prefix_spans, &indicator, &spans, left_width as usize, right_width as usize, column_style);
         }
     }
     dels.clear();
     adds.clear();
 }
 
-fn fill_empty_side(side: &mut Vec<Line<'static>>, side_width: usize, prefix: &str, line_count: usize, column_style: Style, theme: &Theme) {
+fn build_empty_indicator(content_width: usize, rows: usize, theme: &Theme) -> Vec<Span<'static>> {
+    if content_width == 0 || rows == 0 {
+        return Vec::new();
+    }
     let indicator_bg = if theme.diff_add_bg != Color::Reset {
         Color::Rgb(0x20, 0x20, 0x20)
     } else {
         Color::Rgb(0xe0, 0xe0, 0xe0)
     };
-    let indicator_style = Style::default().fg(theme.dim_text).bg(indicator_bg);
-    let prefix_width: usize = prefix.chars().map(|c| UnicodeWidthStr::width(c.to_string().as_str())).sum();
-    let content_width = side_width.saturating_sub(prefix_width);
-
-    for j in 0..line_count {
-        let mut spans: Vec<Span<'static>> = Vec::new();
-        if j == 0 {
-            spans.push(Span::styled(prefix.to_string(), column_style));
-        }
-        if content_width > 0 {
-            let mut s = String::with_capacity(content_width);
-            let pattern = "//";
-            while s.len() < content_width {
-                s.push_str(pattern);
-            }
-            s.truncate(content_width);
-            spans.push(Span::styled(s, indicator_style));
-        }
-        fill_rest_of_line(&mut spans, side_width, Some(indicator_bg));
-        side.push(Line::from(spans));
+    let mut s = String::with_capacity(content_width);
+    let pattern = "//";
+    while s.len() < content_width {
+        s.push_str(pattern);
     }
+    s.truncate(content_width);
+    (0..rows)
+        .map(|_| Span::styled(s.clone(), Style::default().fg(theme.dim_text).bg(indicator_bg)))
+        .collect()
 }
 
 fn build_prefix_spans(sign: char, lineno: u32, number_style: Style, column_style: Style) -> Vec<Span<'static>> {
